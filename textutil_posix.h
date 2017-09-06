@@ -20,13 +20,18 @@ extern "C" {
 /* theoretically this is an include loop. Thanks include guards. */
 #include "textutil.h"
 
+struct termios oldt;
+
 void
 __tu_atexit(int sig)
 {
 	/* silence warning */
 	(void)(sig);
-	tu_show_cursor();
 	tu_shutdown();
+
+	/* reset terminal to initial state */
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
 	exit(1);
 }
 
@@ -39,6 +44,8 @@ tu_init(void)
 	printf("\033[?1049h");
 	tu_clear_screen();
 	fflush(stdout);
+	/* grab terminal initial state */
+	tcgetattr(STDIN_FILENO, &oldt);
 	tu_set_pos(0, 0);
 }
 
@@ -47,6 +54,7 @@ tu_shutdown(void)
 {
 	/* exit alternate buffer */
 	printf("\033[?1049l");
+	tu_show_cursor();
 }
 
 void
@@ -155,9 +163,8 @@ tu_reset_color(void)
 static int
 getch(void)
 {
-	struct termios oldt, newt;
+	struct termios newt;
 	int ch = 0;
-	tcgetattr(STDIN_FILENO, &oldt);
 	newt = oldt;
 	newt.c_lflag &= ~(ICANON | ECHO);
 	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
